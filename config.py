@@ -26,7 +26,7 @@ DATABASE_NAME = "MPoster_bot"
 
 # Channel Configuration
 DATABASE_CHANNEL_ID = int(os.getenv("DATABASE_CHANNEL_ID", -1002681833322))
-MOVIE_CHANNEL_ID = int(os.getenv("MOVIE_CHANNEL_ID", Movieshub_101))
+MOVIE_CHANNEL_ID = int(os.getenv("MOVIE_CHANNEL_ID", -1002298011955))
 
 # Posting Configuration - NEW OPTION
 POST_TO_CHANNEL = os.getenv("POST_TO_CHANNEL", "true").lower() == "true"  # true = channel, false = direct
