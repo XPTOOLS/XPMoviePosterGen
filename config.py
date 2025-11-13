@@ -4,21 +4,21 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Bot Configuration
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8533611007:AAG_9IZxRGlRgIq4_6_bVWBVCRe7AwTEai8")
-API_ID = int(os.getenv("API_ID", 22911014))
-API_HASH = os.getenv("API_HASH", "bdf50bb3057917988dff629a18f8bdb0")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "")
+API_ID = int(os.getenv("API_ID", ))
+API_HASH = os.getenv("API_HASH", "")
 
 # TMDB Configuration - FIXED URLs
-TMDB_API_KEY = os.getenv("TMDB_API_KEY", "d6b0fe020db56e35227657fd8c0afd5c")  # Your v3 API key
+TMDB_API_KEY = os.getenv("TMDB_API_KEY", "")  # Your v3 API key
 TMDB_BASE_URL = "https://api.themoviedb.org/3"  # API base URL
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500"  # Image base URL
 
 # OMDb Configuration - NEW
-OMDB_API_KEY = os.getenv("OMDB_API_KEY", "fede8ce9")
+OMDB_API_KEY = os.getenv("OMDB_API_KEY", "")
 OMDB_BASE_URL = "http://www.omdbapi.com/"
 
 # MongoDB Configuration
-MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://anonymousguywas:12345Trials@cluster0.t4nmrtp.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+MONGO_URI = os.getenv("MONGO_URI", "")
 DATABASE_NAME = "MPoster_bot"
 
 # Channel Configuration
@@ -26,7 +26,7 @@ DATABASE_CHANNEL_ID = int(os.getenv("DATABASE_CHANNEL_ID", -1002681833322))
 MOVIE_CHANNEL_ID = int(os.getenv("MOVIE_CHANNEL_ID", -1002298011955))
 
 # Posting Configuration - NEW OPTION
-POST_TO_CHANNEL = os.getenv("POST_TO_CHANNEL", "false").lower() == "true"  # true = channel, false = direct
+POST_TO_CHANNEL = os.getenv("POST_TO_CHANNEL", "true").lower() == "true"  # true = channel, false = direct
 # Private Sending Configuration - NEW
 PRIVATE_SEND_USER_ID = int(os.getenv("PRIVATE_SEND_USER_ID", "5962658076"))  # Your user ID
 
@@ -64,7 +64,7 @@ CACHE_TTL_SECONDS = 60 * 60 * 24 * 7  # 7 days
 OPTIONAL_USE_OCR = False
 
 # Admin Configuration
-ADMIN_USER_IDS = [int(x) for x in os.getenv("ADMIN_USER_IDS", "5962658076").split(",")]
+ADMIN_USER_IDS = [int(x) for x in os.getenv("ADMIN_USER_IDS", "").split(",")]
 
 def setup_directories():
     """Create required directories without importing logger"""
@@ -81,3 +81,4 @@ os.makedirs(TEMP_FOLDER, exist_ok=True)
 os.makedirs("./assets/fonts/", exist_ok=True)
 os.makedirs("./assets/templates/", exist_ok=True)
 os.makedirs("./logs/", exist_ok=True)
+
