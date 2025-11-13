@@ -8,6 +8,9 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 API_ID = int(os.getenv("API_ID", ))
 API_HASH = os.getenv("API_HASH", "")
 
+# Keep Alive Configuration
+PORT = 10000  # Port for the health server
+
 # TMDB Configuration - FIXED URLs
 TMDB_API_KEY = os.getenv("TMDB_API_KEY", "")  # Your v3 API key
 TMDB_BASE_URL = "https://api.themoviedb.org/3"  # API base URL
@@ -81,4 +84,5 @@ os.makedirs(TEMP_FOLDER, exist_ok=True)
 os.makedirs("./assets/fonts/", exist_ok=True)
 os.makedirs("./assets/templates/", exist_ok=True)
 os.makedirs("./logs/", exist_ok=True)
+
 
