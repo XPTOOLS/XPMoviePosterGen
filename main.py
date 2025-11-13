@@ -2,11 +2,13 @@
 import asyncio
 import signal
 import sys
+import threading
 from core.logger import log
 from core.client import bot_client
 from database.mongo_client import mongo_client
 from utils.asset_manager import asset_manager
 from handlers import setup_handlers
+from utils.keep_alive import start_keep_alive  # Add this import
 
 class MoviePosterBot:
     def __init__(self):
@@ -77,6 +79,12 @@ async def main():
     
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
+    
+    # Start the keep-alive system in a separate thread
+    log.info("🔗 Starting keep-alive system...")
+    keep_alive_thread = threading.Thread(target=start_keep_alive, daemon=True)
+    keep_alive_thread.start()
+    log.success("✅ Keep-alive system started")
     
     # Start the bot
     if await bot.startup():
