@@ -15,7 +15,7 @@ async def handle_channel_message(client, message: Message):
         log.info(f"📥 Channel message received in database channel (ID: {message.id})")
         
         # Extract movie title from message
-        movie_title = await extract_movie_title(message)
+        movie_title, year = await extract_movie_title(message)
         
         if movie_title:
             log.success(f"🎯 Detected movie in channel: {movie_title}")
