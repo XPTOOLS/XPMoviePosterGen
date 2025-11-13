@@ -1,0 +1,8 @@
+pyrogram
+tgcrypto
+pillow
+requests
+pymongo
+loguru
+python-dotenv
+pytesseract>=0.3.10  # Optional: for OCR feature
