@@ -1,53 +1,97 @@
 import re
 from pyrogram.types import Message
+from typing import Tuple, Optional
 from core.logger import log
 
-async def extract_movie_title(message: Message) -> str:
-    """Extract movie title from various message types"""
+async def extract_movie_title(message: Message) -> Tuple[str, Optional[int]]:
+    """Extract movie title and year from various message types"""
     try:
         # Case 1: Text message
         if message.text:
             log.debug("📝 Processing text message")
-            return _clean_movie_title(message.text)
+            return _extract_title_and_year(message.text)
         
         # Case 2: Document with filename
         if message.document and message.document.file_name:
             log.debug("📄 Processing document with filename")
             filename = message.document.file_name
-            title = _extract_title_from_filename(filename)
+            title, year = _extract_title_and_year_from_filename(filename)
             if title:
-                return title
+                return title, year
         
         # Case 3: Photo with caption
         if message.photo and message.caption:
             log.debug("🖼️ Processing photo with caption")
-            return _clean_movie_title(message.caption)
+            return _extract_title_and_year(message.caption)
         
         # Case 4: Video with caption or filename
         if message.video:
             if message.caption:
                 log.debug("🎥 Processing video with caption")
-                return _clean_movie_title(message.caption)
+                return _extract_title_and_year(message.caption)
             elif message.video.file_name:
                 log.debug("🎥 Processing video with filename")
-                title = _extract_title_from_filename(message.video.file_name)
+                title, year = _extract_title_and_year_from_filename(message.video.file_name)
                 if title:
-                    return title
+                    return title, year
         
         # Case 5: Check caption for any media
         if message.caption:
             log.debug("📋 Processing message caption")
-            return _clean_movie_title(message.caption)
+            return _extract_title_and_year(message.caption)
         
         log.warning("🔍 No movie title could be extracted from message")
-        return ""
+        return "", None
         
     except Exception as e:
         log.error(f"💥 Error extracting movie title: {e}")
-        return ""
+        return "", None
 
-def _extract_title_from_filename(filename: str) -> str:
-    """Extract movie title from filename - IMPROVED for TV series"""
+def _extract_title_and_year(text: str) -> Tuple[str, Optional[int]]:
+    """Extract title and year from text"""
+    if not text:
+        return "", None
+    
+    cleaned = text.strip()
+    
+    # Remove URLs
+    cleaned = re.sub(r'http\S+', '', cleaned)
+    
+    # Remove excessive whitespace
+    cleaned = re.sub(r'\s+', ' ', cleaned)
+    
+    # Extract year from various patterns
+    year = None
+    year_patterns = [
+        r'\((\d{4})\)',  # (2014)
+        r'\[(\d{4})\]',  # [2014]
+        r'\s+(\d{4})\s*$',  # 2014 at the end
+        r'\s+\((\d{4})\)\s*$',  # (2014) at the end
+        r'^(\d{4})\s+',  # 2014 at the beginning
+    ]
+    
+    for pattern in year_patterns:
+        match = re.search(pattern, cleaned)
+        if match:
+            try:
+                year = int(match.group(1))
+                # Remove the year part from the title
+                cleaned = re.sub(pattern, '', cleaned).strip()
+                break
+            except (ValueError, IndexError):
+                continue
+    
+    # Trim to reasonable length (first 100 chars)
+    cleaned = cleaned[:100].strip()
+    
+    if cleaned and len(cleaned) > 2:
+        log.debug(f"🧹 Extracted title: '{text}' → '{cleaned}' (year: {year})")
+        return cleaned, year
+    
+    return "", None
+
+def _extract_title_and_year_from_filename(filename: str) -> Tuple[str, Optional[int]]:
+    """Extract movie title and year from filename"""
     try:
         # Remove file extension
         name_without_ext = re.sub(r'\.[^.]*$', '', filename)
@@ -55,15 +99,27 @@ def _extract_title_from_filename(filename: str) -> str:
         # First, try to extract TV series pattern (most specific)
         series_match = _extract_tv_series_pattern(name_without_ext)
         if series_match:
-            return series_match
+            # For TV series, extract year separately
+            series_title, series_year = _extract_title_and_year(series_match)
+            return series_title, series_year
+        
+        # Extract year from filename first
+        year = None
+        year_match = re.search(r'\b(19|20)\d{2}\b', name_without_ext)
+        if year_match:
+            try:
+                year = int(year_match.group(0))
+                # Remove the year for title cleaning
+                name_without_ext = re.sub(r'\b(19|20)\d{2}\b', '', name_without_ext)
+            except ValueError:
+                pass
         
         # Common patterns in movie filenames
         patterns_to_remove = [
-            r'\b\d{3,4}p\b',  # Resolution like 1080p, 720p (word boundaries)
+            r'\b\d{3,4}p\b',  # Resolution like 1080p, 720p
             r'\bbluray\b', r'\bwebrip\b', r'\bwebdl\b', r'\bhdrip\b', r'\bdvdrip\b',
             r'\bx264\b', r'\bx265\b', r'\bhevc\b', r'\bavc\b',
-            r'\b\d{4}\b',  # Year as separate word
-            r'\[.*?\]', r'\(.*?\)',  # Brackets and parentheses
+            r'\[.*?\]', r'\(.*?\)',  # Brackets and parentheses (but we already extracted year)
             r'\b(?:ppv|rip|dvd|scr|brrip|brip|extended|remastered|unrated|directors.cut)\b',
             r'\b(?:ac3|dts|aac|mp3|dd5\.1|dts\-hd)\b',  # Audio codecs
             r'\b(?:h264|h265|av1)\b',  # Video codecs
@@ -76,7 +132,6 @@ def _extract_title_from_filename(filename: str) -> str:
         cleaned = name_without_ext
         
         # First, try to extract title between specific patterns
-        # Look for patterns like: Movie.Name.2025.1080p... or Movie-Name-2025...
         title_match = re.search(r'^([A-Za-z0-9]+(?:[.\-\s][A-Za-z0-9]+)*)', cleaned)
         if title_match:
             cleaned = title_match.group(1)
@@ -91,18 +146,15 @@ def _extract_title_from_filename(filename: str) -> str:
         # Remove extra spaces and trim
         cleaned = re.sub(r'\s+', ' ', cleaned).strip()
         
-        # If we have what looks like a year at the end, remove it
-        cleaned = re.sub(r'\s+\d{4}$', '', cleaned)
-        
         if cleaned:
-            log.debug(f"🔄 Filename '{filename}' → Title '{cleaned}'")
-            return cleaned
+            log.debug(f"🔄 Filename '{filename}' → Title '{cleaned}' (year: {year})")
+            return cleaned, year
         
-        return ""
+        return "", None
         
     except Exception as e:
         log.error(f"💥 Error extracting title from filename: {e}")
-        return ""
+        return "", None
 
 def _extract_tv_series_pattern(filename: str) -> str:
     """Extract TV series name from filename patterns"""
@@ -139,32 +191,11 @@ def _extract_tv_series_pattern(filename: str) -> str:
         log.error(f"💥 Error extracting TV series pattern: {e}")
         return ""
 
+# Keep the old function for backward compatibility but mark it as deprecated
 def _clean_movie_title(title: str) -> str:
-    """Clean and normalize movie title"""
-    if not title:
-        return ""
-    
-    # Remove common prefixes/suffixes and clean up
-    cleaned = title.strip()
-    
-    # Remove URLs
-    cleaned = re.sub(r'http\S+', '', cleaned)
-    
-    # Remove excessive whitespace
-    cleaned = re.sub(r'\s+', ' ', cleaned)
-    
-    # Remove year at the end if present
-    cleaned = re.sub(r'\s*\(\d{4}\)\s*$', '', cleaned)
-    cleaned = re.sub(r'\s*\d{4}\s*$', '', cleaned)
-    
-    # Trim to reasonable length (first 100 chars)
-    cleaned = cleaned[:100].strip()
-    
-    if cleaned and len(cleaned) > 2:
-        log.debug(f"🧹 Cleaned title: '{title}' → '{cleaned}'")
-        return cleaned
-    
-    return ""
+    """DEPRECATED: Use _extract_title_and_year instead"""
+    cleaned_title, _ = _extract_title_and_year(title)
+    return cleaned_title
 
 def is_duplicate_request(movie_title: str, file_size: int = None) -> bool:
     """Check if this is a duplicate movie request (same title + similar size)"""
