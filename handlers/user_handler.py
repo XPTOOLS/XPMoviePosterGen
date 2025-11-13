@@ -18,7 +18,7 @@ async def handle_private_message(client, message: Message):
         log.info(f"👤 Private message from {message.from_user.id} - {message.from_user.first_name}")
         
         # Extract movie title from message
-        movie_title = await extract_movie_title(message)
+        movie_title, year = await extract_movie_title(message)
         
         if movie_title:
             log.success(f"🎯 Detected movie title: {movie_title}")
@@ -85,7 +85,7 @@ async def _handle_movie_selection(client, message: Message, movie_title: str):
                 return
         
         # Search for multiple movies (get 10 results for pagination)
-        all_movies = tmdb_api.search_multiple_movies(clean_title, year, limit=10)
+        all_movies = tmdb_api.search_multiple_movies(clean_title, year, limit=50)
         
         # If no TMDB results, try OMDb fallback
         if not all_movies:
