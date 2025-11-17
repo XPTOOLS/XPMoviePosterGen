@@ -468,6 +468,59 @@ class TMDBAPI:
         """Search and get full movie details by title (backward compatibility)"""
         log.warning(f"🔄 Using legacy get_movie_by_title for: '{title}'")
         return self.get_media_by_title(title, year)
+    
+def get_media_by_imdb_id(self, imdb_id: str) -> Optional[Dict]:
+    """Get media details by IMDB ID (works for both movies and TV)"""
+    try:
+        log.info(f"🔍 Searching TMDB by IMDB ID: {imdb_id}")
+        
+        # First try as movie
+        url = f"{self.base_url}/find/{imdb_id}"
+        params = self.params.copy()
+        params["external_source"] = "imdb_id"
+        
+        response = requests.get(url, params=params, timeout=15)
+        
+        if response.status_code == 401:
+            log.error("❌ TMDB API Key rejected")
+            return None
+            
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        # Check movie results first
+        movie_results = data.get("movie_results", [])
+        if movie_results:
+            movie_data = movie_results[0]
+            movie_id = movie_data.get("id")
+            log.success(f"✅ Found movie via IMDB ID: {imdb_id} -> TMDB ID: {movie_id}")
+            return self.get_movie_details(movie_id)
+        
+        # Check TV results
+        tv_results = data.get("tv_results", [])
+        if tv_results:
+            tv_data = tv_results[0]
+            tv_id = tv_data.get("id")
+            log.success(f"✅ Found TV series via IMDB ID: {imdb_id} -> TMDB ID: {tv_id}")
+            return self.get_tv_series_details(tv_id)
+        
+        # Check TV episode results (if it's a specific episode)
+        tv_episode_results = data.get("tv_episode_results", [])
+        if tv_episode_results:
+            # For episodes, get the parent series
+            episode_data = tv_episode_results[0]
+            tv_id = episode_data.get("show_id")
+            if tv_id:
+                log.success(f"✅ Found TV episode via IMDB ID: {imdb_id} -> Series TMDB ID: {tv_id}")
+                return self.get_tv_series_details(tv_id)
+        
+        log.warning(f"❌ No media found for IMDB ID: {imdb_id}")
+        return None
+        
+    except Exception as e:
+        log.error(f"💥 Error searching TMDB by IMDB ID {imdb_id}: {e}")
+        return None
 
 # Global TMDB API instance
 tmdb_api = TMDBAPI()
