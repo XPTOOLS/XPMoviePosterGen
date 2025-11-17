@@ -7,7 +7,7 @@ from pyrogram.types import (
 from pyrogram import enums
 from datetime import datetime, timedelta
 from database.movie_data import get_recent_movies
-from config import DOWNLOAD_BOT_LINK, LIST_CHANNEL_ID
+from config import DOWNLOAD_BOT_LINK, LIST_CHANNEL_ID, QUALITY_PATTERNS, EPISODE_PATTERNS, SERIES_FIXES, COMMON_INDICATORS_PATTERN
 from core.logger import log
 
 # Store message IDs for editing
@@ -99,7 +99,7 @@ def _create_alphabet_buttons(organized_movies):
         return InlineKeyboardMarkup([[InlineKeyboardButton("❌ Error", callback_data="noop")]])
 
 def _remove_duplicate_movies(movies):
-    """Remove duplicate movies based on title (case insensitive)"""
+    """Remove duplicate movies and group TV series episodes"""
     try:
         seen_titles = set()
         unique_movies = []
@@ -112,48 +112,90 @@ def _remove_duplicate_movies(movies):
             # Clean the title for better deduplication
             clean_title = _clean_movie_title(title)
             
-            if clean_title not in seen_titles:
-                seen_titles.add(clean_title)
+            # Extract series base name (remove episode info)
+            series_base_name = _extract_series_base_name(clean_title)
+            
+            # Use series base name for deduplication if it's a series
+            dedup_key = series_base_name if series_base_name != clean_title else clean_title
+            
+            if dedup_key not in seen_titles:
+                seen_titles.add(dedup_key)
+                # Store the cleaned title for display
+                movie['display_title'] = series_base_name.title() if series_base_name != clean_title else clean_title.title()
                 unique_movies.append(movie)
         
-        log.info(f"🔄 Deduplication: {len(movies)} → {len(unique_movies)} unique titles")
+        log.info(f"🔄 Deduplication: {len(movies)} → {len(unique_movies)} unique titles/series")
         return unique_movies
         
     except Exception as e:
         log.error(f"💥 Error removing duplicates: {e}")
         return movies
 
+def _extract_series_base_name(title):
+    """Extract base series name by removing episode information"""
+    try:
+        import re
+        
+        clean_title = title.lower()
+        
+        # Remove common indicators using config pattern
+        clean_title = re.sub(COMMON_INDICATORS_PATTERN, '', clean_title, flags=re.IGNORECASE)
+        
+        # Remove quality patterns from config
+        for pattern in QUALITY_PATTERNS:
+            clean_title = re.sub(pattern, '', clean_title, flags=re.IGNORECASE)
+        
+        # Apply episode patterns from config
+        original_title = clean_title
+        for pattern in EPISODE_PATTERNS:
+            clean_title = re.sub(pattern, '', clean_title)
+        
+        # Remove trailing separators and clean up
+        clean_title = re.sub(r'[\.\-\_\s]+$', '', clean_title)
+        clean_title = clean_title.strip()
+        
+        # If the title got too short (less than 3 characters), use original
+        if len(clean_title) < 3:
+            clean_title = original_title
+        
+        # Apply series fixes from config
+        if clean_title in SERIES_FIXES:
+            clean_title = SERIES_FIXES[clean_title]
+        
+        # If we removed something, return the cleaned version
+        if clean_title and clean_title != original_title:
+            log.debug(f"📺 Extracted series base: '{title}' → '{clean_title}'")
+            return clean_title
+        
+        return original_title
+        
+    except Exception as e:
+        log.error(f"💥 Error extracting series base name: {e}")
+        return title
+
 def _clean_movie_title(title):
     """Clean movie title for better deduplication"""
     try:
         import re
         
-        # Remove common quality indicators
-        quality_patterns = [
-            r'\b(480p|720p|1080p|2160p|4k|hd|fhd|uhd|bluray|webdl|webrip|dvdrip|brrip)\b',
-            r'\b(x264|x265|h264|h265|hevc|avc)\b',
-            r'\b(ac3|aac|dd5\.1|dts)\b',
-            r'\[.*?\]',  # Remove anything in brackets
-            r'\(.*?\)',  # Remove anything in parentheses (but keep year)
-        ]
-        
         clean_title = title.lower().strip()
         
-        # Remove quality patterns
-        for pattern in quality_patterns:
+        # Remove common indicators using config pattern (most comprehensive)
+        clean_title = re.sub(COMMON_INDICATORS_PATTERN, '', clean_title, flags=re.IGNORECASE)
+        
+        # Remove quality patterns from config
+        for pattern in QUALITY_PATTERNS:
             clean_title = re.sub(pattern, '', clean_title, flags=re.IGNORECASE)
         
         # Remove extra spaces and special characters
-        clean_title = re.sub(r'[^\w\s]', ' ', clean_title)  # Replace special chars with space
-        clean_title = re.sub(r'\s+', ' ', clean_title).strip()  # Remove extra spaces
+        clean_title = re.sub(r'[^\w\s]', ' ', clean_title)
+        clean_title = re.sub(r'\s+', ' ', clean_title).strip()
         
         # Extract year if present (for better grouping)
         year_match = re.search(r'\b(19|20)\d{2}\b', clean_title)
         if year_match:
             year = year_match.group()
-            # Remove year from title for deduplication
             clean_title = re.sub(r'\s*\b(19|20)\d{2}\b', '', clean_title).strip()
-            # Add year at the end for consistent grouping
             clean_title = f"{clean_title} {year}"
         
         return clean_title.strip()
@@ -168,7 +210,8 @@ def _organize_movies_by_alphabet(movies):
         organized = {}
         
         for movie in movies:
-            title = movie.get('movie_title', '').strip()
+            # Use display_title if available, otherwise use original title
+            title = movie.get('display_title') or movie.get('movie_title', '').strip()
             if not title:
                 continue
                 
@@ -217,7 +260,7 @@ def _generate_letter_chunk_message(letter, chunk_movies, chunk_num, total_chunks
         
         message_parts.append("")
         message_parts.append(f"🤖 <b>Movie Bot:</b>")
-        message_parts.append(f"<code>@Moviessearchfilterbot</code>")
+        message_parts.append(f"@Moviessearchfilterbot")
         message_parts.append("")
         
         for movie in chunk_movies:
