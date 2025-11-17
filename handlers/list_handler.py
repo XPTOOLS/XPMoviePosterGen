@@ -223,7 +223,7 @@ def _generate_letter_chunk_message(letter, chunk_movies, chunk_num, total_chunks
         for movie in chunk_movies:
             # Truncate long movie names
             display_name = movie[:50] + "..." if len(movie) > 50 else movie
-            message_parts.append(f"▶️{display_name}")
+            message_parts.append(f"<code>▶️{display_name}</code>")
         
         message_parts.append("")
         if total_chunks > 1:
