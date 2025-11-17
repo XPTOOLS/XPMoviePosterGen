@@ -8,7 +8,11 @@ from utils.image_generator import poster_generator
 from utils.caption_builder import build_caption
 from utils.channel_poster import send_to_channel
 from database.movie_data import log_movie_request, mark_movie_processed, is_series_processed, mark_series_processed
-from config import POST_TO_CHANNEL, DOWNLOAD_BOT_LINK, PRIVATE_SEND_USER_ID, USE_IMDB_FALLBACK
+from config import (
+    POST_TO_CHANNEL, DOWNLOAD_BOT_LINK, PRIVATE_SEND_USER_ID, USE_IMDB_FALLBACK,
+    COMMON_WORDS_TO_REMOVE, TITLE_CLEANING_PATTERNS, QUALITY_PATTERNS,
+    SERIES_SEARCH_ALTERNATIVES, CACHE_CONFIG
+)
 
 # Cache to track processed series (to avoid duplicates within same session)
 processed_series_cache = {}
@@ -63,21 +67,21 @@ async def _should_process_movie(movie_title: str, message: Message) -> bool:
         # Create a unique key for this movie
         movie_key = f"movie_{clean_title}"
         
-        # Check if this movie was recently processed (within last 1 hour)
+        # Check if this movie was recently processed (within cooldown period)
         current_time = time.time()
         if movie_key in recently_processed:
             last_processed = recently_processed[movie_key]
-            if current_time - last_processed < 3600:  # 1 hour cooldown
+            if current_time - last_processed < CACHE_CONFIG['movie_cooldown']:
                 log.info(f"⏭️ Movie recently processed: {movie_title}")
                 return False
         
         # Mark this movie as processed
         recently_processed[movie_key] = current_time
         
-        # Clean up old entries (keep only last 1000 entries)
-        if len(recently_processed) > 1000:
+        # Clean up old entries
+        if len(recently_processed) > CACHE_CONFIG['max_cache_entries']:
             # Remove oldest entries
-            oldest_keys = sorted(recently_processed.keys(), key=lambda k: recently_processed[k])[:100]
+            oldest_keys = sorted(recently_processed.keys(), key=lambda k: recently_processed[k])[:CACHE_CONFIG['cleanup_batch_size']]
             for key in oldest_keys:
                 del recently_processed[key]
         
@@ -90,10 +94,21 @@ async def _should_process_movie(movie_title: str, message: Message) -> bool:
 def _clean_title_for_comparison(title: str) -> str:
     """Clean title for duplicate comparison"""
     import re
-    # Remove year, quality, resolution, file extensions, etc.
-    clean_title = re.sub(r'[\.\_]', ' ', title)  # Replace dots and underscores with spaces
-    clean_title = re.sub(r'\s*(19|20)\d{2}\s*', ' ', clean_title)  # Remove years
-    clean_title = re.sub(r'\b(1080p|720p|480p|4k|hd|bluray|webrip|webdl|x264|x265|hevc)\b', '', clean_title, flags=re.IGNORECASE)
+    
+    clean_title = title
+    
+    # Apply cleaning patterns from config
+    for pattern in TITLE_CLEANING_PATTERNS:
+        clean_title = re.sub(pattern, ' ', clean_title)
+    
+    # Remove quality/resolution patterns from config
+    for pattern in QUALITY_PATTERNS:
+        clean_title = re.sub(pattern, '', clean_title, flags=re.IGNORECASE)
+    
+    # Also use the common indicators pattern from list handler
+    from config import COMMON_INDICATORS_PATTERN
+    clean_title = re.sub(COMMON_INDICATORS_PATTERN, '', clean_title, flags=re.IGNORECASE)
+    
     clean_title = re.sub(r'\s+', ' ', clean_title).strip().lower()
     return clean_title
 
@@ -153,7 +168,7 @@ async def _should_process_series(series_info: dict, message: Message) -> bool:
         current_time = time.time()
         if series_key in recently_processed:
             last_processed = recently_processed[series_key]
-            if current_time - last_processed < 3600:  # 1 hour cooldown
+            if current_time - last_processed < CACHE_CONFIG['series_cooldown']:
                 log.info(f"⏭️ Series season recently processed: {series_name} S{season}")
                 return False
         
@@ -422,10 +437,46 @@ async def _try_alternative_series_searches(series_name: str, year: int = None):
 
 def _remove_common_words(title: str) -> str:
     """Remove common words from title for better searching"""
-    common_words = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by']
     words = title.split()
-    filtered_words = [word for word in words if word.lower() not in common_words]
+    filtered_words = [word for word in words if word.lower() not in COMMON_WORDS_TO_REMOVE]
     return ' '.join(filtered_words)
+
+async def _try_alternative_series_searches(series_name: str, year: int = None):
+    """Try alternative search strategies for TV series using config"""
+    alternatives = []
+    
+    for alternative_template in SERIES_SEARCH_ALTERNATIVES:
+        if alternative_template == "{original}":
+            alt_name = series_name
+        elif alternative_template == "{title_case}":
+            alt_name = series_name.title()
+        elif alternative_template == "{and_to_ampersand}":
+            alt_name = series_name.replace(" and ", " & ")
+        elif alternative_template == "{series_suffix}":
+            alt_name = series_name + " series"
+        elif alternative_template == "{remove_common_words}":
+            alt_name = _remove_common_words(series_name)
+        elif alternative_template == "{extract_main_title}":
+            alt_name = _extract_main_title(series_name)
+        else:
+            alt_name = alternative_template
+        
+        if alt_name not in alternatives:
+            alternatives.append(alt_name)
+    
+    for alt_name in alternatives:
+        if alt_name == series_name:
+            continue  # Skip if same as original
+            
+        log.info(f"🔄 Trying alternative TV series search: '{alt_name}'")
+        tv_results = tmdb_api.search_tv_series(alt_name, year, limit=1)
+        if tv_results:
+            series_data = tmdb_api.get_tv_series_details(tv_results[0]['id'])
+            if series_data:
+                log.info(f"✅ Found via alternative search: '{alt_name}'")
+                return series_data
+    
+    return None
 
 def _extract_main_title(title: str) -> str:
     """Extract the main part of the title (first few words)"""
