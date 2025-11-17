@@ -5,4 +5,7 @@ requests
 pymongo
 loguru
 python-dotenv
-pytesseract>=0.3.10  # Optional: for OCR feature
+pytesseract  # Optional: for OCR feature
+PyMovieDb
+lxml_html_clean
+BeautifulSoup
