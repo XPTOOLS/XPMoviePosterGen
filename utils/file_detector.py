@@ -275,3 +275,4 @@ def _extract_series_name(filename: str, pattern: str) -> str:
         log.error(f"💥 Error extracting series name: {e}")
         # Fallback: basic cleaning
         return re.sub(r'[._\-]', ' ', filename).strip()
+        
