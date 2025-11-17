@@ -11,6 +11,12 @@ API_HASH = os.getenv("API_HASH", "")
 # Keep Alive Configuration
 PORT = 10000  # Port for the health server
 
+# Welcome image url
+WELCOME_IMAGE_URL = os.getenv("WELCOME_IMAGE_URL", "https://i.ibb.co/9mmk62rg/xplogo.jpg")  # Add your image URL
+
+# Movies/Series Generated list channel
+LIST_CHANNEL_ID = os.getenv("LIST_CHANNEL_ID", "@MovieBox_x")  # Channel where lists will be posted
+
 # TMDB Configuration - FIXED URLs
 TMDB_API_KEY = os.getenv("TMDB_API_KEY", "")  # Your v3 API key
 TMDB_BASE_URL = "https://api.themoviedb.org/3"  # API base URL
@@ -20,13 +26,19 @@ TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500"  # Image base URL
 OMDB_API_KEY = os.getenv("OMDB_API_KEY", "")
 OMDB_BASE_URL = "http://www.omdbapi.com/"
 
+# IMDB Configuration (Fallback)
+IMDB_BASE_URL = "https://www.imdb.com"
+IMDB_SEARCH_URL = "https://imdb.iamidiotareyoutoo.com/search?q={}"
+IMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500"  # We'll use TMDB images for consistency
+USE_IMDB_FALLBACK = True  # Enable/disable IMDB fallback
+
 # MongoDB Configuration
 MONGO_URI = os.getenv("MONGO_URI", "")
 DATABASE_NAME = "MPoster_bot"
 
 # Channel Configuration
 DATABASE_CHANNEL_ID = int(os.getenv("DATABASE_CHANNEL_ID", -1002681833322))
-MOVIE_CHANNEL_ID = os.getenv("MOVIE_CHANNEL_ID", "@MoviesHub_101")
+MOVIE_CHANNEL_ID = os.getenv("MOVIE_CHANNEL_ID", "@Movieshub_101")
 
 # Posting Configuration - NEW OPTION
 POST_TO_CHANNEL = os.getenv("POST_TO_CHANNEL", "true").lower() == "true"  # true = channel, false = direct
@@ -84,5 +96,3 @@ os.makedirs(TEMP_FOLDER, exist_ok=True)
 os.makedirs("./assets/fonts/", exist_ok=True)
 os.makedirs("./assets/templates/", exist_ok=True)
 os.makedirs("./logs/", exist_ok=True)
-
-
