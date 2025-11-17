@@ -5,6 +5,7 @@ from core.logger import log
 class MovieDataManager:
     def __init__(self):
         self.collection = mongo_client.get_collection("movie_requests")
+        self.series_collection = mongo_client.get_collection("processed_series")
     
     def log_request(self, movie_title: str, file_size: int = None, user_id: int = None):
         """Log a movie request to detect duplicates"""
@@ -59,6 +60,64 @@ class MovieDataManager:
             
         except Exception as e:
             log.error(f"💥 Error marking as processed: {e}")
+    
+    def is_series_processed(self, series_name: str, season: int) -> bool:
+        """Check if a series season has already been processed"""
+        try:
+            if self.series_collection is None:
+                return False
+            
+            # Look for this series + season in the database
+            existing = self.series_collection.find_one({
+                "series_name": series_name.lower().strip(),
+                "season": season
+            })
+            
+            return existing is not None
+            
+        except Exception as e:
+            log.error(f"💥 Error checking series processed status: {e}")
+            return False
+    
+    def mark_series_processed(self, series_name: str, season: int):
+        """Mark a series season as processed"""
+        try:
+            if self.series_collection is None:
+                return
+            
+            self.series_collection.insert_one({
+                "series_name": series_name.lower().strip(),
+                "season": season,
+                "timestamp": time.time()
+            })
+            log.debug(f"✅ Marked series as processed: {series_name} Season {season}")
+            
+        except Exception as e:
+            log.error(f"💥 Error marking series as processed: {e}")
+
+    def get_recent_movies(self, start_time, end_time):
+        """Get movies processed within a time range"""
+        try:
+            log.info(f"📊 Fetching recent movies from {start_time} to {end_time}")
+            
+            # Convert datetime to timestamp for database query
+            start_timestamp = start_time.timestamp()
+            end_timestamp = end_time.timestamp()
+            
+            # Get ALL movies from the time range
+            recent_movies = list(self.collection.find({
+                "timestamp": {
+                    '$gte': start_timestamp,
+                    '$lte': end_timestamp
+                }
+            }).sort("timestamp", -1))
+            
+            log.success(f"✅ Found {len(recent_movies)} movies in the time range")
+            return recent_movies
+            
+        except Exception as e:
+            log.error(f"💥 Error getting recent movies: {e}")
+            return []
 
 # Global movie data manager
 movie_data_manager = MovieDataManager()
@@ -72,3 +131,12 @@ def get_recent_requests(movie_title: str, time_window: int = 3600) -> list:
 
 def mark_movie_processed(movie_title: str):
     movie_data_manager.mark_as_processed(movie_title)
+
+def is_series_processed(series_name: str, season: int) -> bool:
+    return movie_data_manager.is_series_processed(series_name, season)
+
+def mark_series_processed(series_name: str, season: int):
+    movie_data_manager.mark_series_processed(series_name, season)
+
+def get_recent_movies(start_time, end_time):
+    return movie_data_manager.get_recent_movies(start_time, end_time)
