@@ -2,6 +2,10 @@ import re
 from pyrogram.types import Message
 from typing import Tuple, Optional
 from core.logger import log
+from config import (
+    YEAR_PATTERNS, FILENAME_CLEANING_PATTERNS, TV_SERIES_PATTERNS,
+    SEASON_PATTERNS, QUALITY_PATTERNS
+)
 
 async def extract_movie_title(message: Message) -> Tuple[str, Optional[int]]:
     """Extract movie title and year from various message types"""
@@ -60,17 +64,9 @@ def _extract_title_and_year(text: str) -> Tuple[str, Optional[int]]:
     # Remove excessive whitespace
     cleaned = re.sub(r'\s+', ' ', cleaned)
     
-    # Extract year from various patterns
+    # Extract year from various patterns using config
     year = None
-    year_patterns = [
-        r'\((\d{4})\)',  # (2014)
-        r'\[(\d{4})\]',  # [2014]
-        r'\s+(\d{4})\s*$',  # 2014 at the end
-        r'\s+\((\d{4})\)\s*$',  # (2014) at the end
-        r'^(\d{4})\s+',  # 2014 at the beginning
-    ]
-    
-    for pattern in year_patterns:
+    for pattern in YEAR_PATTERNS:
         match = re.search(pattern, cleaned)
         if match:
             try:
@@ -114,21 +110,7 @@ def _extract_title_and_year_from_filename(filename: str) -> Tuple[str, Optional[
             except ValueError:
                 pass
         
-        # Common patterns in movie filenames
-        patterns_to_remove = [
-            r'\b\d{3,4}p\b',  # Resolution like 1080p, 720p
-            r'\bbluray\b', r'\bwebrip\b', r'\bwebdl\b', r'\bhdrip\b', r'\bdvdrip\b',
-            r'\bx264\b', r'\bx265\b', r'\bhevc\b', r'\bavc\b',
-            r'\[.*?\]', r'\(.*?\)',  # Brackets and parentheses (but we already extracted year)
-            r'\b(?:ppv|rip|dvd|scr|brrip|brip|extended|remastered|unrated|directors.cut)\b',
-            r'\b(?:ac3|dts|aac|mp3|dd5\.1|dts\-hd)\b',  # Audio codecs
-            r'\b(?:h264|h265|av1)\b',  # Video codecs
-            r'\b(?:rarbg|yts|amzn|amazon|web|hdtv)\b',  # Sources
-            r'\b(?:dubbed|dual\.audio|subbed)\b',  # Audio features
-            r'\b(?:youthtrendx|rarbg|yts|amzn|amazon)\b',  # Release groups
-        ]
-        
-        # Clean the filename step by step
+        # Clean the filename step by step using config patterns
         cleaned = name_without_ext
         
         # First, try to extract title between specific patterns
@@ -136,8 +118,8 @@ def _extract_title_and_year_from_filename(filename: str) -> Tuple[str, Optional[
         if title_match:
             cleaned = title_match.group(1)
         
-        # Remove all the patterns
-        for pattern in patterns_to_remove:
+        # Remove all the patterns from config
+        for pattern in FILENAME_CLEANING_PATTERNS:
             cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE)
         
         # Replace dots, underscores, and hyphens with spaces
@@ -157,19 +139,9 @@ def _extract_title_and_year_from_filename(filename: str) -> Tuple[str, Optional[
         return "", None
 
 def _extract_tv_series_pattern(filename: str) -> str:
-    """Extract TV series name from filename patterns"""
+    """Extract TV series name from filename patterns using config"""
     try:
-        # TV series patterns (most specific first)
-        patterns = [
-            # S01E01 pattern
-            r'^(.+?)[\.\s\-_]*(?:s\d{1,2}e\d{1,2}|season[\s\.]?\d{1,2}[\s\.]?episode[\s\.]?\d{1,2})',
-            # S01 pattern (season only)
-            r'^(.+?)[\.\s\-_]*(?:s\d{1,2}(?!e\d))',
-            # Season 1 pattern
-            r'^(.+?)[\.\s\-_]*(?:season[\s\.]?\d{1,2})',
-        ]
-        
-        for pattern in patterns:
+        for pattern in TV_SERIES_PATTERNS:
             match = re.search(pattern, filename, re.IGNORECASE)
             if match:
                 series_name = match.group(1).strip()
@@ -178,7 +150,9 @@ def _extract_tv_series_pattern(filename: str) -> str:
                 series_name = re.sub(r'\s+', ' ', series_name).strip()
                 
                 # Remove common quality/release patterns that might be at the end
-                series_name = re.sub(r'\s*(?:1080p|720p|webrip|bluray|youthtrendx).*$', '', series_name, flags=re.IGNORECASE)
+                # Use the common indicators pattern from config
+                from config import COMMON_INDICATORS_PATTERN
+                series_name = re.sub(COMMON_INDICATORS_PATTERN, '', series_name, flags=re.IGNORECASE)
                 series_name = series_name.strip()
                 
                 if series_name:
@@ -212,18 +186,9 @@ def is_duplicate_request(movie_title: str, file_size: int = None) -> bool:
     return False
 
 def extract_season_series_info(filename: str) -> dict:
-    """Extract season and series information from filename"""
+    """Extract season and series information from filename using config"""
     try:
-        # Patterns for TV series (most specific first)
-        season_patterns = [
-            r'[Ss](\d{1,2})[Ee](\d{1,2})',  # S01E01
-            r'(\d{1,2})[Xx](\d{1,2})',      # 1x01
-            r'[Ss]eason[\s\.]?(\d{1,2})[\s\.]?[Ee]pisode[\s\.]?(\d{1,2})',  # Season 1 Episode 1
-            r'[Ss](\d{1,2})',               # S01
-            r'[Ss]eason[\s\.]?(\d{1,2})',   # Season 1
-        ]
-        
-        for pattern in season_patterns:
+        for pattern in SEASON_PATTERNS:
             match = re.search(pattern, filename, re.IGNORECASE)
             if match:
                 season_num = int(match.group(1)) if match.groups() else 1
@@ -246,22 +211,18 @@ def extract_season_series_info(filename: str) -> dict:
         return {'is_series': False}
 
 def _extract_series_name(filename: str, pattern: str) -> str:
-    """Extract series name by removing season/episode patterns and quality info"""
+    """Extract series name by removing season/episode patterns and quality info using config"""
     try:
         # Remove the season/episode pattern and everything after it
         cleaned = re.sub(pattern + '.*', '', filename, flags=re.IGNORECASE)
         
-        # Remove common file patterns and quality info
-        quality_patterns = [
-            r'[\.\s\-_]*(?:1080p|720p|480p|2160p|4k)',
-            r'[\.\s\-_]*(?:webrip|webdl|bluray|hdtv|dvdrip)',
-            r'[\.\s\-_]*(?:x264|x265|hevc|avc)',
-            r'[\.\s\-_]*(?:youthtrendx|rarbg|yts|amzn)',
-            r'[\.\s\-_]*$'  # Trailing separators
-        ]
-        
-        for quality_pattern in quality_patterns:
+        # Remove common file patterns and quality info from config
+        for quality_pattern in QUALITY_PATTERNS:
             cleaned = re.sub(quality_pattern, '', cleaned, flags=re.IGNORECASE)
+        
+        # Also use the common indicators pattern for comprehensive cleaning
+        from config import COMMON_INDICATORS_PATTERN
+        cleaned = re.sub(COMMON_INDICATORS_PATTERN, '', cleaned, flags=re.IGNORECASE)
         
         # Replace dots, underscores, and hyphens with spaces
         cleaned = re.sub(r'[._\-]', ' ', cleaned)
@@ -275,4 +236,3 @@ def _extract_series_name(filename: str, pattern: str) -> str:
         log.error(f"💥 Error extracting series name: {e}")
         # Fallback: basic cleaning
         return re.sub(r'[._\-]', ' ', filename).strip()
-        
