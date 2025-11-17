@@ -2,7 +2,7 @@ import requests
 import time
 import re
 from typing import Dict, Optional, List, Tuple
-from config import TMDB_API_KEY, TMDB_BASE_URL, TMDB_IMAGE_BASE
+from config import TMDB_API_KEY, TMDB_BASE_URL, TMDB_IMAGE_BASE, USE_IMDB_FALLBACK
 from core.logger import log
 
 class TMDBAPI:
@@ -432,6 +432,31 @@ class TMDBAPI:
             return self.get_movie_details(media_id)
         else:  # tv
             return self.get_tv_series_details(media_id)
+
+    def get_media_by_title_with_fallback(self, title: str, year: Optional[int] = None) -> Optional[Dict]:
+        """Search and get full details by title with IMDB fallback"""
+        try:
+            # First try TMDB
+            movie_data = self.get_media_by_title(title, year)
+            if movie_data:
+                return movie_data
+            
+            # TMDB failed, try IMDB fallback
+            if USE_IMDB_FALLBACK:
+                log.info(f"🔄 TMDB failed, trying IMDB fallback for: '{title}'")
+                from utils.imdb_api import imdb_api
+                imdb_data = imdb_api.get_movie_by_title(title, year)
+                
+                if imdb_data:
+                    log.info(f"✅ IMDB fallback successful for: {imdb_data['title']}")
+                    return imdb_data
+            
+            log.warning(f"❌ No results found in TMDB or IMDB for: '{title}'")
+            return None
+            
+        except Exception as e:
+            log.error(f"💥 Error in media search with fallback for '{title}': {e}")
+            return None
 
     # KEEP THE OLD METHOD FOR BACKWARD COMPATIBILITY
     def search_movie(self, query: str, year: Optional[int] = None) -> Optional[Dict]:
