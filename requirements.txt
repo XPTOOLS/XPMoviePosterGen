@@ -8,4 +8,5 @@ python-dotenv
 pytesseract  # Optional: for OCR feature
 PyMovieDb
 lxml_html_clean
-BeautifulSoup
+BeautifulSoup4
+
