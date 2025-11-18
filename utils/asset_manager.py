@@ -1,6 +1,6 @@
 import os
 from core.logger import log
-from config import FONT_PATH_BOLD, FONT_PATH_REGULAR, POSTER_TEMPLATE
+from config import FONT_PATH_BOLD, FONT_PATH_REGULAR
 
 class AssetManager:
     def __init__(self):
@@ -20,13 +20,9 @@ class AssetManager:
             if not regular_font_exists:
                 log.warning(f"⚠️ Regular font not found: {FONT_PATH_REGULAR}")
             
-            # Check template
-            template_exists = os.path.exists(POSTER_TEMPLATE)
-            if not template_exists:
-                log.warning(f"⚠️ Poster template not found: {POSTER_TEMPLATE}")
             
             # Summary
-            if bold_font_exists and regular_font_exists and template_exists:
+            if bold_font_exists and regular_font_exists:
                 log.success("✅ All assets found and ready!")
                 self.assets_ready = True
             else:
