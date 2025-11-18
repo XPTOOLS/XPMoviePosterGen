@@ -6,6 +6,7 @@ class MovieDataManager:
     def __init__(self):
         self.collection = mongo_client.get_collection("movie_requests")
         self.series_collection = mongo_client.get_collection("processed_series")
+        self.list_messages_collection = mongo_client.get_collection("list_messages")
     
     def log_request(self, movie_title: str, file_size: int = None, user_id: int = None):
         """Log a movie request to detect duplicates"""
@@ -119,6 +120,59 @@ class MovieDataManager:
             log.error(f"💥 Error getting recent movies: {e}")
             return []
 
+    def get_list_message_ids(self):
+        """Get stored list message IDs from database"""
+        try:
+            if self.list_messages_collection is None:
+                return {}
+                
+            result = self.list_messages_collection.find_one({"_id": "message_ids"})
+            return result.get("message_ids", {}) if result else {}
+        except Exception as e:
+            log.error(f"💥 Error getting list message IDs: {e}")
+            return {}
+
+    def save_list_message_ids(self, message_ids):
+        """Save list message IDs to database"""
+        try:
+            if self.list_messages_collection is None:
+                return
+                
+            self.list_messages_collection.update_one(
+                {"_id": "message_ids"},
+                {"$set": {"message_ids": message_ids}},
+                upsert=True
+            )
+            log.debug(f"💾 Saved {len(message_ids)} list message IDs to database")
+        except Exception as e:
+            log.error(f"💥 Error saving list message IDs: {e}")
+
+    def get_all_movies(self):
+        """Get ALL movies from database (not just recent)"""
+        try:
+            if self.collection is None:
+                return []
+                
+            all_movies = list(self.collection.find({}).sort("timestamp", -1))
+            log.info(f"📊 Retrieved {len(all_movies)} total movies from database")
+            return all_movies
+        except Exception as e:
+            log.error(f"💥 Error getting all movies: {e}")
+            return []
+
+    def delete_list_message_ids(self):
+        """Delete all list message IDs from database"""
+        try:
+            if self.list_messages_collection is None:
+                return False
+                
+            result = self.list_messages_collection.delete_one({"_id": "message_ids"})
+            log.info("🗑️ Deleted all list message IDs from database")
+            return result.deleted_count > 0
+        except Exception as e:
+            log.error(f"💥 Error deleting list message IDs: {e}")
+            return False
+
 # Global movie data manager
 movie_data_manager = MovieDataManager()
 
@@ -140,3 +194,15 @@ def mark_series_processed(series_name: str, season: int):
 
 def get_recent_movies(start_time, end_time):
     return movie_data_manager.get_recent_movies(start_time, end_time)
+
+def get_list_message_ids():
+    return movie_data_manager.get_list_message_ids()
+
+def save_list_message_ids(message_ids):
+    movie_data_manager.save_list_message_ids(message_ids)
+
+def get_all_movies():
+    return movie_data_manager.get_all_movies()
+
+def delete_list_message_ids():
+    return movie_data_manager.delete_list_message_ids()
