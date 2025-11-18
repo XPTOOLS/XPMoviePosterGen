@@ -371,6 +371,13 @@ class IMDBAPI:
             else:
                 media_type = 'movie'
             
+            # EXTRACT LANGUAGE - ADD THIS SECTION
+            language = imdb_data.get('inLanguage', 'en')
+            if isinstance(language, list):
+                language = language[0] if language else 'en'
+            if not language or language == 'None':
+                language = 'en'
+            
             # Build standardized movie data
             standardized_data = {
                 'movie_id': imdb_id,
@@ -386,7 +393,8 @@ class IMDBAPI:
                 'poster_url': imdb_data.get('poster', ''),
                 'runtime': runtime,
                 'popularity': 0,
-                'original_language': 'en',
+                'original_language': language,
+                'language': language,  # required by image generator
                 'media_type': media_type,
                 'source': 'imdb',
                 'cached_at': time.time()
