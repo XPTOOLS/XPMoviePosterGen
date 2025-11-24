@@ -51,7 +51,7 @@ DOWNLOAD_BOT_LINK = os.getenv("DOWNLOAD_BOT_LINK", "https://t.me/Moviessearchfil
 
 # Watermark Configuration
 CHANNEL_WATERMARK_HANDLE = os.getenv("CHANNEL_WATERMARK_HANDLE", "@Movieshub_101")
-TELEGRAM_LOGO_URL = os.getenv("TELEGRAM_LOGO_URL", "https://i.ibb.co/DgKqgfz1/tlogo.png")
+TELEGRAM_LOGO_URL = os.getenv("TELEGRAM_LOGO_URL", "https://i.ibb.co/Wv1Mds7X/tglogo.jpg")
 TELEGRAM_LOGO_SIZE = int(os.getenv("TELEGRAM_LOGO_SIZE", "30"))
 
 # Fonts Configuration
@@ -257,3 +257,4 @@ SEASON_PATTERNS = [
     r'[Ss](\d{1,2})',               # S01
     r'[Ss]eason[\s\.]?(\d{1,2})',   # Season 1
 ]
+
